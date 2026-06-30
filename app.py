@@ -1,6 +1,6 @@
 """
 Provenance Guard — Flask API
-Milestone 3: POST /submit (Signal 1 live, Signal 2 stub) + GET /log
+Milestone 5: Full production layer — all endpoints live
 """
 
 import uuid
@@ -115,12 +115,49 @@ def log():
 @app.route("/appeal/<submission_id>", methods=["POST"])
 @limiter.limit("3 per minute")
 def appeal(submission_id):
-    return jsonify({"message": "Appeal endpoint coming in Milestone 5."}), 501
+    """
+    POST /appeal/<submission_id>
+    Body: { "creator_id": "...", "reason": "..." }
+    Updates submission status to 'under_review' and logs the appeal.
+    """
+    body = request.get_json(silent=True)
+    if not body:
+        return jsonify({"error": "Request body is required."}), 400
+
+    creator_id: str = body.get("creator_id", "").strip()
+    reason: str = body.get("reason", "").strip()
+
+    if not reason:
+        return jsonify({"error": "'reason' field is required — explain why you believe the classification is incorrect."}), 400
+
+    if len(reason) > 1000:
+        return jsonify({"error": "'reason' must be 1000 characters or fewer."}), 400
+
+    # Verify the submission exists and log the appeal
+    found = db.log_appeal(
+        submission_id=submission_id,
+        creator_id=creator_id,
+        reason=reason,
+    )
+
+    if not found:
+        return jsonify({"error": f"Submission '{submission_id}' not found."}), 404
+
+    return jsonify({
+        "submission_id": submission_id,
+        "status": "under_review",
+        "message": "Your appeal has been recorded and will be reviewed.",
+    }), 200
 
 
 @app.route("/appeals", methods=["GET"])
 def appeals():
-    return jsonify({"message": "Appeals listing coming in Milestone 5."}), 501
+    """
+    GET /appeals
+    Returns all submissions currently under review, with appeal reasons.
+    """
+    entries = db.get_appeals()
+    return jsonify({"appeals": entries, "count": len(entries)}), 200
 
 
 # ---------------------------------------------------------------------------
