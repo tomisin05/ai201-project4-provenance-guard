@@ -64,8 +64,10 @@ def classify_with_llm(text: str) -> float:
             max_tokens=64,
         )
 
-        raw = response.choices[0].message.content.strip()
-        return _parse_score(raw)
+        content = response.choices[0].message.content
+        if content is None:
+            return 0.5
+        return _parse_score(content.strip())
 
     except Exception as exc:
         print(f"[signal1_llm] Groq call failed: {exc}")
